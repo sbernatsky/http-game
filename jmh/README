@@ -1,0 +1,8 @@
+You need JMH to build and run this test:
+    http://openjdk.java.net/projects/code-tools/jmh/
+
+Building:
+    $ mvn clean package
+
+Running:
+    $ java -jar target/benchmarks.jar JMH -wi 5 -i 5 -f 1 -t 8
