@@ -1,8 +1,13 @@
 package com.sbernatsky.tests.king.jmh;
 
+import java.util.List;
 import java.util.Random;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
+
+import com.sbernatsky.tests.king.server.core.LevelScore;
+
+import com.sbernatsky.tests.king.server.core.Level;
 
 import com.sbernatsky.tests.king.server.core.LevelRWLockImpl;
 import com.sbernatsky.tests.king.server.core.LevelSynchronizedImpl;
@@ -19,20 +24,55 @@ import org.openjdk.jmh.annotations.State;
 
 @BenchmarkMode(Mode.AverageTime)
 @OutputTimeUnit(TimeUnit.NANOSECONDS)
-@State(Scope.Group)
+@State(Scope.Benchmark)
 public class JMHLevelSync {
-    private static final int USERS_COUNT = 1024;
-    private static final int MAX_SCORE = 1024;
+    private static final int USERS_COUNT = 32 * 1024;
+    private static final int MAX_SCORE = 32 * 2 * 1024;
 
     private User[] users;
+    private int[] scores;
+
+    @State(Scope.Thread)
+    public static class Counter {
+        int seed = ThreadLocalRandom.current().nextInt(USERS_COUNT);
+    }
 
     @Setup
     public void setUp() {
         users = new User[USERS_COUNT];
+        scores = new int[USERS_COUNT];
         Random random = new Random();
         for (int i = 0; i < USERS_COUNT; i++) {
-            users[i] = new User(random.nextInt(USERS_COUNT/2));
+            users[i] = new User(random.nextInt(USERS_COUNT/16));
+            scores[i] = random.nextInt(MAX_SCORE);
         }
+    }
+
+    @State(Scope.Thread)
+    public static class Plain {
+        LevelImpl level = new LevelImpl();
+
+        {
+            Random random = new Random();
+            for (int i = 0; i < USERS_COUNT; i++) {
+                level.addScore(new User(random.nextInt(USERS_COUNT/16)), random.nextInt(MAX_SCORE));
+            }
+        }
+    }
+
+    @Benchmark
+    @Group("plain")
+    @GroupThreads(3)
+    public Object getScoresPlain(Plain s) {
+        return s.level.getScores();
+    }
+
+    @Benchmark
+    @Group("plain")
+    @GroupThreads(1)
+    public boolean addScorePlain(Plain s, Counter counter) {
+        int idx = (counter.seed++) % USERS_COUNT;
+        return s.level.addScore(users[idx], scores[idx]);
     }
 
     @State(Scope.Group)
@@ -50,11 +90,9 @@ public class JMHLevelSync {
     @Benchmark
     @Group("synchronized")
     @GroupThreads(1)
-    public int addScoreSync(Sync s) {
-        int userId = ThreadLocalRandom.current().nextInt(USERS_COUNT);
-        int score = ThreadLocalRandom.current().nextInt(MAX_SCORE);
-        s.level.addScore(users[userId], score);
-        return score;
+    public boolean addScoreSync(Sync s, Counter counter) {
+        int idx = (counter.seed++) % USERS_COUNT;
+        return s.level.addScore(users[idx], scores[idx]);
     }
 
     @State(Scope.Group)
@@ -72,11 +110,22 @@ public class JMHLevelSync {
     @Benchmark
     @Group("rwlock")
     @GroupThreads(1)
-    public int addScoreRWLock(RWLock s) {
-        int userId = ThreadLocalRandom.current().nextInt(USERS_COUNT);
-        int score = ThreadLocalRandom.current().nextInt(MAX_SCORE);
-        s.level.addScore(users[userId], score);
-        return score;
+    public boolean addScoreRWLock(RWLock s, Counter counter) {
+        int idx = (counter.seed++) % USERS_COUNT;
+        return s.level.addScore(users[idx], scores[idx]);
     }
 
+    private static class LevelImpl extends Level {
+
+        @Override
+        public boolean addScore(User user, int score) {
+            return doAddScore(user, score);
+        }
+
+        @Override
+        public List<LevelScore> getScores() {
+            return doGetScores();
+        }
+        
+    }
 }

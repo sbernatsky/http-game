@@ -35,11 +35,11 @@ public class LevelSynchronizedImpl extends Level {
     private final Object lock = new Object();
 
     @Override
-    public void addScore(User user, int score) {
+    public boolean addScore(User user, int score) {
         // FIXME: not efficient, consider switching to array of level scores or some packing
         // TODO: test performance using jmh
         synchronized (lock) {
-            doAddScore(user, score);
+            return doAddScore(user, score);
         }
     }
 

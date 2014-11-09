@@ -9,11 +9,11 @@ public class LevelRWLockImpl extends Level {
     private final ReadWriteLock lock = new ReentrantReadWriteLock();
 
     @Override
-    public void addScore(User user, int score) {
+    public boolean addScore(User user, int score) {
         Lock writeLock = lock.writeLock();
         writeLock.lock();
         try {
-            doAddScore(user, score);
+            return doAddScore(user, score);
         } finally {
             writeLock.unlock();
         }
